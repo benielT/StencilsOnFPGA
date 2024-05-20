@@ -173,7 +173,7 @@ static void process_grid( hls::stream<uint256_dt> &rd_buffer, hls::stream<uint25
 			float r1 = s1 + s2;
 			float r2 = s3 + s4;
 			float r = r1 + r2;
-			float result  = r1 + r2 + r3_3;
+			float result  = r + r3_3;
             bool change_cond = (index <= 0 || index > sizex || (i == 1) || (i == end_row));
             mem_wr[q] = change_cond ? row_arr1[q+1] : result;
         }
