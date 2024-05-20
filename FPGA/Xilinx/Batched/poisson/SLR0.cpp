@@ -107,11 +107,11 @@ void process_SLR0 (uint512_dt*  arg0, uint512_dt*  arg1, hls::stream <t_pkt> &in
 	}
 
 	// sending data to kernel which resides in another SLR
-	fifo256_2axis(streamArray[20], out, data_g);
+	fifo256_2axis(streamArray[SLR0_P_STAGE], out, data_g);
 	// getting data from kernel which resides in another SLR
-	axis2_fifo256(in, streamArray[21], data_g);
+	axis2_fifo256(in, streamArray[SLR0_P_STAGE+1], data_g);
 
-	stream_convert_256_512(streamArray[21], wr_buffer, data_g);
+	stream_convert_256_512(streamArray[SLR0_P_STAGE+1], wr_buffer, data_g);
 	write_grid(arg1, wr_buffer, data_g);
 
 }

@@ -37,7 +37,7 @@ void process_SLR (hls::stream <t_pkt> &in, hls::stream <t_pkt> &out,
 		process_grid( streamArray[i], streamArray[i+1], data_g);
 	}
 
-	fifo256_2axis(streamArray[20], out, data_g);
+	fifo256_2axis(streamArray[SLR2_P_STAGE], out, data_g);
 
 
 }
