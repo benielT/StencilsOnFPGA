@@ -3,7 +3,7 @@
 #include <ap_axi_sdata.h>
 #include <math.h>
 #include <stdio.h>
-#include "blacksholes_common.h"
+#include "blackscholes_common.h"
 #include "stencil.h"
 #include "stencil.cpp"
 

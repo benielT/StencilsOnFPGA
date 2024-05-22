@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <chrono>
 #include "xcl2.hpp"
-#include "blacksholes_cpu.h"
+#include "blackscholes_cpu.h"
 
 //#define DEBUG_VERBOSE
 #define MULTI_SLR

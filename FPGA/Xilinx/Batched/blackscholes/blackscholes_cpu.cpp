@@ -1,4 +1,4 @@
-#include "blacksholes_cpu.h"
+#include "blackscholes_cpu.h"
 
 float standard_normal_CDF(float val)
 {

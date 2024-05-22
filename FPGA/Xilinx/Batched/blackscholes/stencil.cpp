@@ -1,4 +1,6 @@
+
 #include "stencil.h"
+#pragma once
 
 static void axis2_fifo256(hls::stream <t_pkt> &in, hls::stream<uint256_dt> &out,  const unsigned int total_itr)
 {
@@ -21,7 +23,7 @@ static void fifo256_2axis(hls::stream <uint256_dt> &in, hls::stream<t_pkt> &out,
 	}
 }
 
-static void inline get_stencil_coefficent(const float & alpha, const float & beta,
+static void get_stencil_coefficent(const float & alpha, const float & beta,
 		const float & delta_t, const int & init_idx, float * a,
 		float * b, float * c)
 {
@@ -173,6 +175,5 @@ static void process_grid(hls::stream<uint256_dt> &rd_buffer, hls::stream<uint256
             wr_buffer << update_j;
             write_itr++;
         }
-
     }
 }
