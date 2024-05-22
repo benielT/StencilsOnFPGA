@@ -90,6 +90,12 @@ int main(int argc, char **argv)
 	calcParam.delta_t = calcParam.time_to_maturity / calcParam.N;
 	calcParam.delta_S = calcParam.strike_price * calcParam.SMaxFactor/ (calcParam.K);
 
+	std::vector<BlacksholesParameter> calcParamVect;
+
+	for (int i = 0; i < gridProp.batch; i++)
+	{
+		calcParamVect.push_back(calcParam);
+	}
 
 	double direct_calc_runtime = 0.0;
 
@@ -120,8 +126,9 @@ int main(int argc, char **argv)
 	float * grid_u1_d = (float*) aligned_alloc(4096, data_size_bytes);
 	float * grid_u2_d = (float*) aligned_alloc(4096, data_size_bytes);
 
+
 	auto init_grid_start_point = std::chrono::high_resolution_clock::now();
-	intialize_grid(grid_u1_cpu, gridProp, calcParam);
+	intialize_grid(grid_u1_cpu, gridProp, calcParamVect);
 	auto init_grid_stop_copy_grid_start_point = std::chrono::high_resolution_clock::now();
 	copy_grid(grid_u1_cpu, grid_u2_cpu, gridProp);
 	auto copy_grid_stop_point = std::chrono::high_resolution_clock::now();
@@ -282,17 +289,17 @@ int main(int argc, char **argv)
 	double d_to_h_runtime = std::chrono::duration<double, std::micro>
 				(d_to_h_stop_point - kernels_stop_d_to_h_start_point).count();
 
-//	for (int i = 0; i < gridProp.act_size_x; i++)
-//	{
-//		if (abs(grid_u1_cpu[i] - grid_ops_result[i]) > EPSILON)
-//		{
-//			std::cout << "value mismatch. i: " << i << " cpu: " << grid_u2_cpu[i] << " ops: " << grid_ops_result[i] << std::endl;
-//		}
-//		else
-//		{
-//			std::cout << "i: " << i << " cpu: " << grid_u2_cpu[i] << " ops: " << grid_ops_result[i] << std::endl;
-//		}
-//	}
+	for (int i = 0; i < gridProp.act_size_x; i++)
+	{
+		if (abs(grid_u1_cpu[i] - grid_ops_result[i]) > EPSILON)
+		{
+			std::cout << "value mismatch. i: " << i << " cpu: " << grid_u2_cpu[i] << " ops: " << grid_ops_result[i] << std::endl;
+		}
+		else
+		{
+			std::cout << "i: " << i << " cpu: " << grid_u2_cpu[i] << " ops: " << grid_ops_result[i] << std::endl;
+		}
+	}
 
 //	for (int i = 0; i < gridProp.logical_size_x; i++)
 //	{
@@ -323,11 +330,11 @@ int main(int argc, char **argv)
 #endif
 	
 #ifndef FPGA_RUN_ONLY
-	std::cout << "call option price from explicit method: " << get_call_option(grid_u1_cpu, gridProp, calcParam) << std::endl;
-	std::cout << "call option price from istvan explicit method: " << get_call_option(grid_u3_cpu, gridProp, calcParam) << std::endl;
-	std::cout << "call option price from ops explicit method: " << get_call_option(grid_ops_result, gridProp, calcParam) << std::endl;
+	std::cout << "call option price from explicit method: " << get_call_option(grid_u1_cpu, calcParam) << std::endl;
+	std::cout << "call option price from istvan explicit method: " << get_call_option(grid_u3_cpu, calcParam) << std::endl;
+	std::cout << "call option price from ops explicit method: " << get_call_option(grid_ops_result calcParam) << std::endl;
 #endif
-	std::cout << "call option price from fpga explicit method: " << get_call_option(grid_u1_d, gridProp, calcParam) << std::endl;
+	std::cout << "call option price from fpga explicit method: " << get_call_option(grid_u1_d, calcParam) << std::endl;
 
 	std::cout << "============================================="  << std::endl << std::endl;
 
