@@ -4,11 +4,14 @@
 #include <chrono>
 #include "xcl2.hpp"
 #include "blacksholes_cpu.h"
-#include "blacksholes_ops/blacksholes_ops.h"
 
 //#define DEBUG_VERBOSE
 #define MULTI_SLR
 #define FPGA_RUN_ONLY
+
+#ifndef FPGA_RUN_ONLY
+#include "blacksholes_ops/blacksholes_ops.h"
+#endif
 /******************************************************************************
 * Main program
 *******************************************************************************/
@@ -17,7 +20,7 @@ int main(int argc, char **argv)
 	GridParameter gridProp;
 	gridProp.logical_size_x = 200;
 	gridProp.logical_size_y = 1;
-	gridProp.batch = 10000;
+	gridProp.batch = 10;
 	gridProp.num_iter = 2040;
 
 	unsigned int vectorization_factor = 8;
@@ -50,8 +53,10 @@ int main(int argc, char **argv)
 
 	printf("Grid: %dx1 , %d iterations, %d batches\n", gridProp.logical_size_x, gridProp.num_iter, gridProp.batch);
 
+#ifndef FPGA_RUN_ONLY
 	//Allocating OPS instance
 	OPS_instance * ops_inst = new OPS_instance(argc, argv, 1);
+#endif
 
 	//adding halo
 	gridProp.act_size_x = gridProp.logical_size_x+2;
@@ -99,6 +104,7 @@ int main(int argc, char **argv)
 
 	double direct_calc_runtime = 0.0;
 
+#ifndef NO_STABILTY_CHECK
 	for (int i = 0; i < gridProp.batch; i++)
 	{
 		double tmp_calc_runtime = 0.0;
@@ -116,25 +122,30 @@ int main(int argc, char **argv)
 		std::cerr << "stencil calculation stability check failed" << std::endl << std::endl;
 		return -1;
 	}
+#endif
 
+#ifndef FPGA_RUN_ONLY
 	float * grid_u1_cpu = (float*) aligned_alloc(4096, data_size_bytes);
 	float * grid_u2_cpu = (float*) aligned_alloc(4096, data_size_bytes);
 	float * grid_u3_cpu = (float*) aligned_alloc(4096, data_size_bytes);
 	float * grid_u4_cpu = (float*) aligned_alloc(4096, data_size_bytes);
 	float * grid_ops_result = (float*) aligned_alloc(4096, data_size_bytes);
-
+#endif
 	float * grid_u1_d = (float*) aligned_alloc(4096, data_size_bytes);
 	float * grid_u2_d = (float*) aligned_alloc(4096, data_size_bytes);
 
 
 	auto init_grid_start_point = std::chrono::high_resolution_clock::now();
-	intialize_grid(grid_u1_cpu, gridProp, calcParamVect);
+	intialize_grid(grid_u1_d, gridProp, calcParamVect);
 	auto init_grid_stop_copy_grid_start_point = std::chrono::high_resolution_clock::now();
-	copy_grid(grid_u1_cpu, grid_u2_cpu, gridProp);
+	copy_grid(grid_u1_d, grid_u2_d, gridProp);
 	auto copy_grid_stop_point = std::chrono::high_resolution_clock::now();
+#ifndef FPGA_RUN_ONLY
+	copy_grid(grid_u1_d, grid_u1_cpu, gridProp);
+	copy_grid(grid_u1_cpu, grid_u2_cpu, gridProp);
 	copy_grid(grid_u1_cpu, grid_u3_cpu, gridProp);
 	copy_grid(grid_u1_cpu, grid_u4_cpu, gridProp);
-	copy_grid(grid_u1_cpu, grid_u1_d, gridProp);
+#endif
 //	copy_grid(grid_u1_cpu, grid_u1_ops, gridProp);
 //	copy_grid(grid_u1_cpu, grid_u2_ops, gridProp);
 
@@ -289,6 +300,8 @@ int main(int argc, char **argv)
 	double d_to_h_runtime = std::chrono::duration<double, std::micro>
 				(d_to_h_stop_point - kernels_stop_d_to_h_start_point).count();
 
+#ifndef FPGA_RUN_ONLY
+#ifdef DEBUG_VERBOSE
 	for (int i = 0; i < gridProp.act_size_x; i++)
 	{
 		if (abs(grid_u1_cpu[i] - grid_ops_result[i]) > EPSILON)
@@ -300,7 +313,8 @@ int main(int argc, char **argv)
 			std::cout << "i: " << i << " cpu: " << grid_u2_cpu[i] << " ops: " << grid_ops_result[i] << std::endl;
 		}
 	}
-
+#endif
+#endif
 //	for (int i = 0; i < gridProp.logical_size_x; i++)
 //	{
 //		std::cout << "idx: " << i << ", dat_current: " << grid_ops_result[i] << std::endl;
@@ -362,8 +376,11 @@ int main(int argc, char **argv)
 	std::cout << "      |--> d_to_h         : " << d_to_h_runtime << " us" << std::endl;
 	std::cout << "      |--> kernels_runtime: " << kernels_runtime << " us" << std::endl;
 	std::cout << "============================================="  << std::endl << std::endl;
+
+#ifndef FPGA_RUN_ONLY
 	//ops_exit
 	delete ops_inst;
+
 
 	//Free memory
 	free(grid_u1_cpu);
@@ -371,6 +388,7 @@ int main(int argc, char **argv)
 	free(grid_u3_cpu);
 	free(grid_u4_cpu);
 	free(grid_ops_result);
+#endif
 	free(grid_u1_d);
 	free(grid_u2_d);
 
