@@ -306,3 +306,24 @@ void intialize_grid(float* grid, GridParameter gridProp, std::vector<Blacksholes
 	}
 }
 
+void init_coefficents(float* a, float*b, float*c, GridParameter gridProp, std::vector<BlacksholesParameter> & computeParam)
+{
+	assert(computeParam.size() == gridProp.batch);
+
+	for (unsigned int bat = 0; bat < gridProp.batch; bat++)
+	{
+		int offset 	= bat * gridProp.grid_size_x;
+		float alpha = computeParam[bat].volatility * computeParam[bat].volatility * computeParam[bat].delta_t;
+		float beta = computeParam[bat].risk_free_rate * computeParam[bat].delta_t;
+
+		//Initializing coefficients
+		for (unsigned int j = 1; j < gridProp.act_size_x - 1; j++)
+		{
+			unsigned int index = j + offset;
+			unsigned int idx = j - 1;
+			a[index] = 0.5 * (alpha * std::pow(idx,2) - beta * idx);
+			b[index] = 1 - alpha * std::pow(idx,2) - beta;
+			c[index] = 0.5 * (alpha * std::pow(idx,2) + beta * idx);
+		}
+	}
+}

@@ -56,6 +56,8 @@ int bs_explicit2(float* current, float *next, GridParameter gridData, std::vecto
 
 void intialize_grid(float* grid, GridParameter gridProp, std::vector<BlacksholesParameter> & computeParam);
 
+void init_coefficents(float* a, float*b, float*c, GridParameter gridProp, std::vector<BlacksholesParameter> & computeParam);
+
 bool stencil_stability(BlacksholesParameter computeParam, bool verbose=false);
 
 double square_error(float* current, float* next, GridParameter gridData);
