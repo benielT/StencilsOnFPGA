@@ -10,19 +10,19 @@
 #include "heat3D_common.h"
 
 //#define DEBUG_VERBOSE
-#define VERIFICATION
+//#define VERIFICATION
 #define MULTI_SLR
-//#define FPGA_RUN_ONLY
+#define FPGA_RUN_ONLY
 
 int main(int argc, char **argv)
 {
     GridParameter gridData;
 
-    gridData.logical_size_x = 100;
-    gridData.logical_size_y = 100;
-    gridData.logical_size_z = 100;
-    gridData.batch = 10;
-    gridData.num_iter = 1000;
+    gridData.logical_size_x = 10;
+    gridData.logical_size_y = 10;
+    gridData.logical_size_z = 10;
+    gridData.batch = 1;
+    gridData.num_iter = 96;
 
     unsigned int vectorization_factor = 8;
 
@@ -31,11 +31,25 @@ int main(int argc, char **argv)
 
     for ( int n = 1; n < argc; n++ )
     {
-        pch = strstr(argv[n], "-size=");
+        pch = strstr(argv[n], "-sizex=");
 
         if(pch != NULL)
         {
             gridData.logical_size_x = atoi ( argv[n] + 7 ); continue;
+        }
+
+        pch = strstr(argv[n], "-sizey=");
+
+        if(pch != NULL)
+        {
+            gridData.logical_size_y = atoi ( argv[n] + 7 ); continue;
+        }
+
+        pch = strstr(argv[n], "-sizez=");
+
+        if(pch != NULL)
+        {
+            gridData.logical_size_z = atoi ( argv[n] + 7 ); continue;
         }
 
         pch = strstr(argv[n], "-iters=");
@@ -52,7 +66,7 @@ int main(int argc, char **argv)
         }
     }
 
-    printf("Grid: %dx1 , %d iterations, %d batches\n", gridData.logical_size_x, gridData.num_iter, gridData.batch);
+    printf("Grid: %dx%dx%d , %d iterations, %d batches\n", gridData.logical_size_x, gridData.logical_size_y, gridData.logical_size_z, gridData.num_iter, gridData.batch);
 
     //adding halo
     gridData.act_size_x = gridData.logical_size_x + 2;
