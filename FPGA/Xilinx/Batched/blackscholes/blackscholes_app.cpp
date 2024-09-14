@@ -3,22 +3,25 @@
 #include <cstdlib>
 #include <chrono>
 #include "xcl2.hpp"
-#include "blacksholes_cpu.h"
-#include "blacksholes_ops/blacksholes_ops.h"
+#include "blackscholes_cpu.h"
 
 //#define DEBUG_VERBOSE
 #define MULTI_SLR
 #define FPGA_RUN_ONLY
+
+#ifndef FPGA_RUN_ONLY
+#include "blacksholes_ops/blacksholes_ops.h"
+#endif
 /******************************************************************************
 * Main program
 *******************************************************************************/
 int main(int argc, char **argv)
 {
 	GridParameter gridProp;
-	gridProp.logical_size_x = 200;
+	gridProp.logical_size_x = 100;
 	gridProp.logical_size_y = 1;
-	gridProp.batch = 10000;
-	gridProp.num_iter = 2040;
+	gridProp.batch = 1;
+	gridProp.num_iter = 96;
 
 	unsigned int vectorization_factor = 8;
 
@@ -27,7 +30,7 @@ int main(int argc, char **argv)
 
 	for ( int n = 1; n < argc; n++ )
 	{
-		pch = strstr(argv[n], "-size=");
+		pch = strstr(argv[n], "-sizex=");
 
 		if(pch != NULL)
 		{
@@ -50,8 +53,10 @@ int main(int argc, char **argv)
 
 	printf("Grid: %dx1 , %d iterations, %d batches\n", gridProp.logical_size_x, gridProp.num_iter, gridProp.batch);
 
+#ifndef FPGA_RUN_ONLY
 	//Allocating OPS instance
 	OPS_instance * ops_inst = new OPS_instance(argc, argv, 1);
+#endif
 
 	//adding halo
 	gridProp.act_size_x = gridProp.logical_size_x+2;
@@ -90,9 +95,16 @@ int main(int argc, char **argv)
 	calcParam.delta_t = calcParam.time_to_maturity / calcParam.N;
 	calcParam.delta_S = calcParam.strike_price * calcParam.SMaxFactor/ (calcParam.K);
 
+	std::vector<BlacksholesParameter> calcParamVect;
+
+	for (int i = 0; i < gridProp.batch; i++)
+	{
+		calcParamVect.push_back(calcParam);
+	}
 
 	double direct_calc_runtime = 0.0;
 
+#ifndef NO_STABILTY_CHECK
 	for (int i = 0; i < gridProp.batch; i++)
 	{
 		double tmp_calc_runtime = 0.0;
@@ -110,24 +122,34 @@ int main(int argc, char **argv)
 		std::cerr << "stencil calculation stability check failed" << std::endl << std::endl;
 		return -1;
 	}
+#endif
 
+#ifndef FPGA_RUN_ONLY
 	float * grid_u1_cpu = (float*) aligned_alloc(4096, data_size_bytes);
 	float * grid_u2_cpu = (float*) aligned_alloc(4096, data_size_bytes);
 	float * grid_u3_cpu = (float*) aligned_alloc(4096, data_size_bytes);
 	float * grid_u4_cpu = (float*) aligned_alloc(4096, data_size_bytes);
 	float * grid_ops_result = (float*) aligned_alloc(4096, data_size_bytes);
-
+#endif
 	float * grid_u1_d = (float*) aligned_alloc(4096, data_size_bytes);
 	float * grid_u2_d = (float*) aligned_alloc(4096, data_size_bytes);
+	float * grid_a_d = (float*) aligned_alloc(4096, data_size_bytes);
+	float * grid_b_d = (float*) aligned_alloc(4096, data_size_bytes);
+	float * grid_c_d = (float*) aligned_alloc(4096, data_size_bytes);
+
 
 	auto init_grid_start_point = std::chrono::high_resolution_clock::now();
-	intialize_grid(grid_u1_cpu, gridProp, calcParam);
+	intialize_grid(grid_u1_d, gridProp, calcParamVect);
+	init_coefficents(grid_a_d, grid_b_d, grid_c_d, gridProp, calcParamVect);
 	auto init_grid_stop_copy_grid_start_point = std::chrono::high_resolution_clock::now();
-	copy_grid(grid_u1_cpu, grid_u2_cpu, gridProp);
+	copy_grid(grid_u1_d, grid_u2_d, gridProp);
 	auto copy_grid_stop_point = std::chrono::high_resolution_clock::now();
+#ifndef FPGA_RUN_ONLY
+	copy_grid(grid_u1_d, grid_u1_cpu, gridProp);
+	copy_grid(grid_u1_cpu, grid_u2_cpu, gridProp);
 	copy_grid(grid_u1_cpu, grid_u3_cpu, gridProp);
 	copy_grid(grid_u1_cpu, grid_u4_cpu, gridProp);
-	copy_grid(grid_u1_cpu, grid_u1_d, gridProp);
+#endif
 //	copy_grid(grid_u1_cpu, grid_u1_ops, gridProp);
 //	copy_grid(grid_u1_cpu, grid_u2_ops, gridProp);
 
@@ -162,7 +184,7 @@ int main(int argc, char **argv)
 	cl::Event event;
 
 	auto devices = xcl::get_devices("Xilinx");
-	auto device = devices[0];
+	auto device = devices[1];
 
 	OCL_CHECK(err, cl::Context context(device, NULL, NULL, NULL, &err));
 	OCL_CHECK(err, cl::CommandQueue queue(context, device, CL_QUEUE_PROFILING_ENABLE | CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, &err));
@@ -182,6 +204,9 @@ int main(int argc, char **argv)
 
 	//Allocation Buffer in Global Memory
 	OCL_CHECK(err, cl::Buffer buffer_curr(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_WRITE, data_size_bytes, grid_u1_d, &err));
+	OCL_CHECK(err, cl::Buffer buffer_a(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_WRITE, data_size_bytes, grid_a_d, &err));
+	OCL_CHECK(err, cl::Buffer buffer_b(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_WRITE, data_size_bytes, grid_b_d, &err));
+	OCL_CHECK(err, cl::Buffer buffer_c(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_WRITE, data_size_bytes, grid_c_d, &err));
 	OCL_CHECK(err, cl::Buffer buffer_next(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, data_size_bytes, grid_u2_d, &err));
 
 #ifdef MULTI_SLR
@@ -190,7 +215,7 @@ int main(int argc, char **argv)
 	unsigned int total_SLR = 1;
 #endif
 
-	unsigned int number_of_process_grid_per_SLR = 2;
+	unsigned int number_of_process_grid_per_SLR = 16;
 	unsigned int total_process_grids_per_iter =  total_SLR * number_of_process_grid_per_SLR * 2;
 	unsigned int num_iter = gridProp.num_iter/total_process_grids_per_iter;
 	//set Kernel arguments
@@ -249,6 +274,9 @@ int main(int argc, char **argv)
 
 	narg = 0;
 	OCL_CHECK(err, err = krnl_mem2stream.setArg(narg++, buffer_curr));
+	OCL_CHECK(err, err = krnl_mem2stream.setArg(narg++, buffer_a));
+	OCL_CHECK(err, err = krnl_mem2stream.setArg(narg++, buffer_b));
+	OCL_CHECK(err, err = krnl_mem2stream.setArg(narg++, buffer_c));
 	OCL_CHECK(err, err = krnl_mem2stream.setArg(narg++, buffer_next));
 	OCL_CHECK(err, err = krnl_mem2stream.setArg(narg++, num_iter));
 	OCL_CHECK(err, err = krnl_mem2stream.setArg(narg++, gridProp.grid_size_x));
@@ -282,18 +310,21 @@ int main(int argc, char **argv)
 	double d_to_h_runtime = std::chrono::duration<double, std::micro>
 				(d_to_h_stop_point - kernels_stop_d_to_h_start_point).count();
 
-//	for (int i = 0; i < gridProp.act_size_x; i++)
-//	{
-//		if (abs(grid_u1_cpu[i] - grid_ops_result[i]) > EPSILON)
-//		{
-//			std::cout << "value mismatch. i: " << i << " cpu: " << grid_u2_cpu[i] << " ops: " << grid_ops_result[i] << std::endl;
-//		}
-//		else
-//		{
-//			std::cout << "i: " << i << " cpu: " << grid_u2_cpu[i] << " ops: " << grid_ops_result[i] << std::endl;
-//		}
-//	}
-
+#ifndef FPGA_RUN_ONLY
+#ifdef DEBUG_VERBOSE
+	for (int i = 0; i < gridProp.act_size_x; i++)
+	{
+		if (abs(grid_u1_cpu[i] - grid_ops_result[i]) > EPSILON)
+		{
+			std::cout << "value mismatch. i: " << i << " cpu: " << grid_u2_cpu[i] << " ops: " << grid_ops_result[i] << std::endl;
+		}
+		else
+		{
+			std::cout << "i: " << i << " cpu: " << grid_u2_cpu[i] << " ops: " << grid_ops_result[i] << std::endl;
+		}
+	}
+#endif
+#endif
 //	for (int i = 0; i < gridProp.logical_size_x; i++)
 //	{
 //		std::cout << "idx: " << i << ", dat_current: " << grid_ops_result[i] << std::endl;
@@ -323,11 +354,11 @@ int main(int argc, char **argv)
 #endif
 	
 #ifndef FPGA_RUN_ONLY
-	std::cout << "call option price from explicit method: " << get_call_option(grid_u1_cpu, gridProp, calcParam) << std::endl;
-	std::cout << "call option price from istvan explicit method: " << get_call_option(grid_u3_cpu, gridProp, calcParam) << std::endl;
-	std::cout << "call option price from ops explicit method: " << get_call_option(grid_ops_result, gridProp, calcParam) << std::endl;
+	std::cout << "call option price from explicit method: " << get_call_option(grid_u1_cpu, calcParam) << std::endl;
+	std::cout << "call option price from istvan explicit method: " << get_call_option(grid_u3_cpu, calcParam) << std::endl;
+	std::cout << "call option price from ops explicit method: " << get_call_option(grid_ops_result calcParam) << std::endl;
 #endif
-	std::cout << "call option price from fpga explicit method: " << get_call_option(grid_u1_d, gridProp, calcParam) << std::endl;
+	std::cout << "call option price from fpga explicit method: " << get_call_option(grid_u1_d, calcParam) << std::endl;
 
 	std::cout << "============================================="  << std::endl << std::endl;
 
@@ -354,9 +385,13 @@ int main(int argc, char **argv)
 	std::cout << "      |--> h_to_d         : " << h_to_d_runtime << " us" << std::endl;
 	std::cout << "      |--> d_to_h         : " << d_to_h_runtime << " us" << std::endl;
 	std::cout << "      |--> kernels_runtime: " << kernels_runtime << " us" << std::endl;
+	std::cout << " Main loop runtime        : " << h_to_d_runtime + kernels_runtime << std::endl;
 	std::cout << "============================================="  << std::endl << std::endl;
+
+#ifndef FPGA_RUN_ONLY
 	//ops_exit
 	delete ops_inst;
+
 
 	//Free memory
 	free(grid_u1_cpu);
@@ -364,9 +399,12 @@ int main(int argc, char **argv)
 	free(grid_u3_cpu);
 	free(grid_u4_cpu);
 	free(grid_ops_result);
+#endif
 	free(grid_u1_d);
 	free(grid_u2_d);
-
+	free(grid_a_d);
+	free(grid_b_d);
+	free(grid_c_d);
 	return 0;
 }
 

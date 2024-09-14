@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <chrono>
 #include <vector>
-#include "blacksholes_common.h"
+#include "blackscholes_common.h"
 //#include "blacksholes_ops.h"
 
 
@@ -55,6 +55,8 @@ float get_call_option(float* data, BlacksholesParameter computeParam);
 int bs_explicit2(float* current, float *next, GridParameter gridData, std::vector<BlacksholesParameter> & computeParam);
 
 void intialize_grid(float* grid, GridParameter gridProp, std::vector<BlacksholesParameter> & computeParam);
+
+void init_coefficents(float* a, float*b, float*c, GridParameter gridProp, std::vector<BlacksholesParameter> & computeParam);
 
 bool stencil_stability(BlacksholesParameter computeParam, bool verbose=false);
 

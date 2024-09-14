@@ -265,7 +265,7 @@ int main(int argc, char **argv)
     q.finish();
 
 
-
+#ifdef VERIFICATION
    dump_rho_mu_yy(grid_yy_rho_mu_temp_d, grid_d, (char*)"rho_d.txt", (char*)"mu_d.txt", (char*)"yy_d.txt");
    float dt = 0.1;
    for(int i = 0; i < batch; i++){
@@ -293,17 +293,19 @@ int main(int argc, char **argv)
 	   }
    }
    dump_rho_mu_yy(grid_yy_rho_mu, grid_d, (char*)"rho.txt", (char*)"mu.txt", (char*)"yy.txt");
-
+#endif
 	
   std::chrono::duration<double> elapsed = finish - start;
+  std::chrono::duration<double, std::micro> elapsed_us = finish - start;
 
-
-  printf("Runtime on FPGA is %f seconds\n", elapsed.count());
+  printf("Runtime on FPGA is %f us\n", elapsed_us.count());
+#ifdef VERIFICATION
   double error = 0;
   for(int i = 0; i < batch; i++){
 	  error = square_error(&grid_yy_rho_mu[grid_d.dims * i], &grid_yy_rho_mu_d[grid_d.dims * i] , grid_d);
 	  printf("batch:%d, Square error is  %f\n", batch, error);
   }
+#endif
   float bandwidth = (grid_d.data_size_bytes_dim8/1000.0 * 4.0 * n_iter)/(elapsed.count() * 1000 * 1000);
   printf("\nBandwidth is %f\n", bandwidth);
   double syn_bandwidth = ((27.0*grid_d.data_size_bytes_dim6 + 8.0 *grid_d.data_size_bytes_dim1)/1000.0 * 2.0 * n_iter * 3)/(elapsed.count() * 1000 * 1000);

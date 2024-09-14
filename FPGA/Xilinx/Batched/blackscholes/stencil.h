@@ -11,7 +11,7 @@ typedef ap_uint<256> uint256_dt;
 typedef ap_axiu<256,0,0,0> t_pkt;
 
 
-#define SLR0_P_STAGE 2
+#define SLR0_P_STAGE 16
 
 //Maximum Tile Size
 #define MAX_SIZE_X 8192
@@ -63,4 +63,5 @@ struct data_G{
 	unsigned short endrow_minus1;
 	unsigned short endindex_minus1;
 };
+
 

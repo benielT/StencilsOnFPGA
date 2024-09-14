@@ -2,9 +2,9 @@
 #include <hls_stream.h>
 #include <ap_axi_sdata.h>
 #include <math.h>
-#include "../src/stencil.h"
+#include "stencil.h"
 #include <stdio.h>
-#include "../src/stencil.cpp"
+#include "stencil.cpp"
 
 
 // coalesced memory access at 512 bit to get maximum out of memory bandwidth
