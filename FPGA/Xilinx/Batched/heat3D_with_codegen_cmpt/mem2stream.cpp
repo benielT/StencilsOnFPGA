@@ -6,18 +6,19 @@
 #include "heat3D_common.h"
 #include "stencil.h"
 #include "stencil.cpp"
+#include "ops_hls_datamover_partial.hpp"
 
 // coalesced memory access at 512 bit to get maximum out of memory bandwidth
 // Single pipelined loop below will be mapped to single memory transfer
 // which will further split into multiple transfers by axim module.
-static void read_grid(uint512_dt*  arg0, hls::stream<uint512_dt> &rd_buffer, const unsigned int total_itr)
-{
-	for (int itr = 0; itr < total_itr; itr++){
-		#pragma HLS PIPELINE II=1
-		#pragma HLS loop_tripcount min=min_grid max=max_grid avg=avg_grid
-		rd_buffer << arg0[itr];
-	}
-}
+// static void read_grid(uint512_dt*  arg0, hls::stream<uint512_dt> &rd_buffer, const unsigned int total_itr)
+// {
+// 	for (int itr = 0; itr < total_itr; itr++){
+// 		#pragma HLS PIPELINE II=1
+// 		#pragma HLS loop_tripcount min=min_grid max=max_grid avg=avg_grid
+// 		rd_buffer << arg0[itr];
+// 	}
+// }
 
 // data width conversion to support 256 bit width compute pipeline
 static void stream_convert_512_256(hls::stream<uint512_dt> &in, hls::stream<uint256_dt> &out,
@@ -57,18 +58,51 @@ static void stream_convert_256_512(hls::stream<uint256_dt> &in, hls::stream<uint
 	}
 }
 
-// coalesced memory write using 512 bit to get maximum out of memory bandwidth
-// Single pipelined loop below will be mapped to single memory transfer
-// which will further split into multiple transfers by axim module.
-static void write_grid(uint512_dt*  arg0, hls::stream<uint512_dt> &wr_buffer, const unsigned int total_itr)
-{
-	for (int itr = 0; itr < total_itr; itr++){
-		#pragma HLS PIPELINE II=1
-		#pragma HLS loop_tripcount min=min_grid max=max_grid avg=avg_grid
-		arg0[itr] = wr_buffer.read();
-	}
-}
+// // coalesced memory write using 512 bit to get maximum out of memory bandwidth
+// // Single pipelined loop below will be mapped to single memory transfer
+// // which will further split into multiple transfers by axim module.
+// static void write_grid(uint512_dt*  arg0, hls::stream<uint512_dt> &wr_buffer, const unsigned int total_itr)
+// {
+// 	for (int itr = 0; itr < total_itr; itr++){
+// 		#pragma HLS PIPELINE II=1
+// 		#pragma HLS loop_tripcount min=min_grid max=max_grid avg=avg_grid
+// 		arg0[itr] = wr_buffer.read();
+// 	}
+// }
 
+
+// FOR REFERENCE
+/*
+static void datamover_outerloop_0_dataflow_read_write_dataflow_region(
+        const unsigned int num_beats,
+        const unsigned int num_pkts,
+        const ops::hls::MemConfig& memconfig,
+        ap_uint<mem_data_width>* arg0,
+        ap_uint<mem_data_width>* arg1,
+        hls::stream <ap_axiu<axis_data_width,0,0,0>>& arg0_axis_out,
+        hls::stream <ap_axiu<axis_data_width,0,0,0>>& arg1_axis_in
+)    
+{
+    static ::hls::stream<ap_uint<mem_data_width>> arg0_read_mem_strm;
+    static ::hls::stream<ap_uint<axis_data_width>> arg0_read_reduced_mem_strm;
+    #pragma HLS STREAM variable = arg0_read_mem_strm depth = max_depth_v16
+    #pragma HLS STREAM variable = arg0_read_reduced_mem_strm depth = max_depth_v8
+    static ::hls::stream<ap_uint<mem_data_width>> arg1_write_mem_strm;
+    static ::hls::stream<ap_uint<axis_data_width>> arg1_write_reduced_mem_strm;
+    #pragma HLS STREAM variable = arg1_write_mem_strm depth = max_depth_v16
+    #pragma HLS STREAM variable = arg1_write_reduced_mem_strm depth = max_depth_v8
+
+#pragma HLS DATAFLOW
+        ops::hls::mem2stream<mem_data_width>(arg0, arg0_read_mem_strm, memconfig);
+        ops::hls::stream2stream<mem_data_width, axis_data_width>(arg0_read_mem_strm, arg0_read_reduced_mem_strm, num_beats);
+        ops::hls::stream2axis<axis_data_width>(arg0_read_reduced_mem_strm, arg0_axis_out, num_pkts);
+        ops::hls::axis2stream<axis_data_width>(arg1_axis_in, arg1_write_reduced_mem_strm, num_pkts);
+    
+        ops::hls::stream2stream<axis_data_width, mem_data_width>(arg1_write_reduced_mem_strm, arg1_write_mem_strm, num_beats);
+        ops::hls::stream2mem<mem_data_width>(arg1, arg1_write_mem_strm, num_beats);
+    
+}
+*/
 
 void process_mem2stream(uint512_dt* arg0, uint512_dt* arg1, const int count, const int xdim0, const int ydim0, const int zdim0,
 			const int batch, hls::stream <t_pkt> &in, hls::stream <t_pkt> &out)
@@ -88,12 +122,20 @@ void process_mem2stream(uint512_dt* arg0, uint512_dt* arg1, const int count, con
 	unsigned int total_itr_512 = (zdim0 * ydim0 * end_index * batch + 1) >> 1;
 
 	#pragma HLS DATAFLOW
-	read_grid(arg0, rd_buffer, total_itr_512);
-	stream_convert_512_256(rd_buffer, streamArray[0], total_itr_512, total_itr_256);
-	fifo256_2axis(streamArray[0], out, total_itr_256);
-	axis2_fifo256(in, streamArray[1], total_itr_256);
-	stream_convert_256_512(streamArray[1], wr_buffer, total_itr_512, total_itr_256);
-	write_grid(arg1, wr_buffer, total_itr_512);
+    ops::hls::mem2stream<512>(arg0, rd_buffer, total_itr_512);
+//    stream_convert_512_256(rd_buffer, streamArray[0], total_itr_512, total_itr_256);
+     ops::hls::stream2streamStepdown<512, 256>(rd_buffer, streamArray[0], total_itr_512);
+    ops::hls::stream2axis<256>(streamArray[0], out, total_itr_256);
+    ops::hls::axis2stream<256>(in, streamArray[1], total_itr_256);
+//    stream_convert_256_512(streamArray[1], wr_buffer, total_itr_512, total_itr_256);
+     ops::hls::stream2streamStepup<256, 512>(streamArray[1], wr_buffer, total_itr_512);
+    ops::hls::stream2mem<512>(arg1, wr_buffer, total_itr_512);
+	// read_grid(arg0, rd_buffer, total_itr_512);
+	// stream_convert_512_256(rd_buffer, streamArray[0], total_itr_512, total_itr_256);
+	// fifo256_2axis(streamArray[0], out, total_itr_256);
+	// axis2_fifo256(in, streamArray[1], total_itr_256);
+	// stream_convert_256_512(streamArray[1], wr_buffer, total_itr_512, total_itr_256);
+	// write_grid(arg1, wr_buffer, total_itr_512);
 
 }
 extern "C" {
