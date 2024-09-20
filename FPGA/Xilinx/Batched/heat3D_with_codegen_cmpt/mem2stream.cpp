@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include "heat3D_common.h"
 #include "stencil.h"
-#include "stencil.cpp"
+//#include "stencil.cpp"
 #include "ops_hls_datamover_partial.hpp"
 
 // coalesced memory access at 512 bit to get maximum out of memory bandwidth
@@ -39,7 +39,7 @@ static void stream_convert_512_256(hls::stream<uint512_dt> &in, hls::stream<uint
 		}
 	}
 }
-
+//
 // data width conversion to support 512 bit width memory write interface
 static void stream_convert_256_512(hls::stream<uint256_dt> &in, hls::stream<uint512_dt> &out,
 		const unsigned int total_itr_512, const unsigned int total_itr_256)
@@ -107,7 +107,7 @@ static void datamover_outerloop_0_dataflow_read_write_dataflow_region(
 void process_mem2stream(uint512_dt* arg0, uint512_dt* arg1, const int count, const int xdim0, const int ydim0, const int zdim0,
 			const int batch, hls::stream <t_pkt> &in, hls::stream <t_pkt> &out)
 {
-	static hls::stream<uint256_dt> streamArray[2];
+	hls::stream<uint256_dt> streamArray[2];
 	static hls::stream<uint512_dt> rd_buffer;
 	static hls::stream<uint512_dt> wr_buffer;
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ops_hls_defs.hpp"
 // #define DEBUG_LOG
 
 #ifndef __SYTHESIS__
@@ -13,11 +14,6 @@
 namespace ops {
 namespace hls {
 
-typedef union 
-{
-    unsigned int i;
-    float f;
-} DataConv;
 /**
  * @brief 	mem2stream reads from a memory location with to an hls stream.
  *  		This is optimized to read from AXI4 with burst and to utilize width maximum througput
@@ -192,7 +188,7 @@ void stream2streamStepdown(::hls::stream<ap_uint<STREAM1_DATA_WIDTH>>& strm_in,
     static_assert(STREAM2_DATA_WIDTH % 8 == 0, "STREAM2_DATA_WIDTH should be divisible by 8");
 #endif
 
-constexpr unsigned short FACTOR = STREAM2_DATA_WIDTH / STREAM1_DATA_WIDTH;
+constexpr unsigned short FACTOR = STREAM1_DATA_WIDTH / STREAM2_DATA_WIDTH;
 
 #ifndef __SYTHESIS__
     #ifdef DEBUG_LOG
@@ -306,11 +302,24 @@ void axis2stream(::hls::stream<ap_axiu<STREAM_DATA_WIDTH,0,0,0>>& strm_in,
 			, __func__, pkts);
 #endif
 #endif
+	ap_axiu<STREAM_DATA_WIDTH,0,0,0> tmp;
+
 	for (int itr = 0; itr < pkts; itr++){
 		#pragma HLS PIPELINE II=1
 
-		ap_axiu<STREAM_DATA_WIDTH,0,0,0> tmp = strm_in.read();
+		tmp = strm_in.read();
 		strm_out << tmp.data;
+#ifdef DEBUG_LOG
+			printf("   |HLS DEBUG_LOG|%s| read axis pkt: %d, val=(",__func__, itr);
+
+			for (unsigned n = 0; n < STREAM_DATA_WIDTH/(DEBUG_LOG_SIZE_OF * 8); n++)
+			{
+				DataConv conv;
+				conv.i = tmp.data.range((n+1) * DEBUG_LOG_SIZE_OF * 8 - 1, n * DEBUG_LOG_SIZE_OF * 8);
+				printf("%f,", conv.f);
+			}
+			printf(")\n");
+#endif
 	}
 }
 
