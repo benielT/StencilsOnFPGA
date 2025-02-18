@@ -11,7 +11,7 @@
 
 //#define DEBUG_VERBOSE
 //#define VERIFICATION
-#define MULTI_SLR
+//#define MULTI_SLR
 #define FPGA_RUN_ONLY
 
 int main(int argc, char **argv)

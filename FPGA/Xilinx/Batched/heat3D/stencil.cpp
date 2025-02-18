@@ -71,10 +71,10 @@ static void process_grid(hls::stream<uint256_dt> &rd_buffer, hls::stream<uint256
 	uint256_dt windowBuff_3[max_depth_8];
 	uint256_dt windowBuff_4[max_depth_xy];
 
-#pragma HLS BIND_STORAGE variable=windowBuff_1 type=ram_t2p impl=uram latency=1
-#pragma HLS BIND_STORAGE variable=windowBuff_2 type=ram_t2p impl=uram latency=1
-#pragma HLS BIND_STORAGE variable=windowBuff_3 type=ram_t2p impl=uram latency=1
-#pragma HLS BIND_STORAGE variable=windowBuff_4 type=ram_t2p impl=uram latency=1
+#pragma HLS BIND_STORAGE variable=windowBuff_1 type=ram_s2p latency=2
+#pragma HLS BIND_STORAGE variable=windowBuff_2 type=ram_s2p latency=2
+#pragma HLS BIND_STORAGE variable=windowBuff_3 type=ram_s2p latency=2
+#pragma HLS BIND_STORAGE variable=windowBuff_4 type=ram_s2p latency=2
 
 	uint256_dt s_1_1_2, s_1_2_1, s_1_1_1, s_1_1_1b, s_1_1_1f, s_1_0_1, s_1_1_0;
 	uint256_dt update_j;

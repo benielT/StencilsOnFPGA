@@ -40,7 +40,7 @@ const int avg_grid = avg_block_x * avg_size_y * avg_size_y;
 const int vec_factor = VEC_FACTOR;
 const int max_depth_16 = MAX_DEPTH_16;
 const int max_depth_8 = MAX_DEPTH_16 *2;
-const int max_depth_xy = max_block_x * max_size_y;
+const int max_depth_xy = max_depth_8 * max_depth_8;
 
 // union to reinterpret float as integer and vice versa
 typedef union  {
