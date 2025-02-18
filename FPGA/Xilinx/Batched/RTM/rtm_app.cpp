@@ -46,7 +46,7 @@
 
 
 #include "rtm.h"
-
+#define SLR_COUNT_2
 
 
 // // OPS header file
@@ -185,7 +185,9 @@ int main(int argc, char **argv)
     auto end_p = std::chrono::high_resolution_clock::now();
 
     OCL_CHECK(err, cl::Kernel krnl_rtm_SLR0(program, "rtm_SLR0", &err));
+#ifndef SLR_COUNT_2
     OCL_CHECK(err, cl::Kernel krnl_rtm_SLR1(program, "rtm_SLR1", &err));
+#endif
     OCL_CHECK(err, cl::Kernel krnl_rtm_SLR2(program, "rtm_SLR2", &err));
 
     std::chrono::duration<double> p_time = end_p - start_p;
@@ -218,6 +220,7 @@ int main(int argc, char **argv)
     OCL_CHECK(err, err = krnl_rtm_SLR0.setArg(narg++, n_iter));
     OCL_CHECK(err, err = krnl_rtm_SLR0.setArg(narg++, batch));
 
+#ifndef SLR_COUNT_2
     narg = 0;
     OCL_CHECK(err, err = krnl_rtm_SLR1.setArg(narg++, grid_d.logical_size_x));
     OCL_CHECK(err, err = krnl_rtm_SLR1.setArg(narg++, grid_d.logical_size_y));
@@ -225,6 +228,7 @@ int main(int argc, char **argv)
     OCL_CHECK(err, err = krnl_rtm_SLR1.setArg(narg++, grid_d.grid_size_x));
     OCL_CHECK(err, err = krnl_rtm_SLR1.setArg(narg++, n_iter));
     OCL_CHECK(err, err = krnl_rtm_SLR1.setArg(narg++, batch));
+#endif
 
     narg = 0;
     OCL_CHECK(err, err = krnl_rtm_SLR2.setArg(narg++, grid_d.logical_size_x));
@@ -247,7 +251,9 @@ int main(int argc, char **argv)
 
 
 	OCL_CHECK(err, err = q.enqueueTask(krnl_rtm_SLR0));
+#ifndef SLR_COUNT_2
 	OCL_CHECK(err, err = q.enqueueTask(krnl_rtm_SLR1));
+#endif
 	OCL_CHECK(err, err = q.enqueueTask(krnl_rtm_SLR2));
 	q.finish();
 
@@ -307,10 +313,14 @@ int main(int argc, char **argv)
   }
 #endif
   float bandwidth = (grid_d.data_size_bytes_dim8/1000.0 * 4.0 * n_iter)/(elapsed.count() * 1000 * 1000);
-  printf("\nBandwidth is %f\n", bandwidth);
+  printf("\nBandwidth is %f, data_size_byte_dim8: %d\n", bandwidth, grid_d.data_size_bytes_dim8);
+#ifndef SLR_COUNT_2
   double syn_bandwidth = ((27.0*grid_d.data_size_bytes_dim6 + 8.0 *grid_d.data_size_bytes_dim1)/1000.0 * 2.0 * n_iter * 3)/(elapsed.count() * 1000 * 1000);
   printf("synthetic bandwidth is %f\n", syn_bandwidth);
-
+#else
+  double syn_bandwidth = ((27.0*grid_d.data_size_bytes_dim6 + 8.0 *grid_d.data_size_bytes_dim1)/1000.0 * 2.0 * n_iter * 2)/(elapsed.count() * 1000 * 1000);
+  printf("synthetic bandwidth is %f\n", syn_bandwidth);
+#endif
 //  act_sizez = 2;
 //  for(int i = 0; i < act_sizez; i++){
 //    for(int j = 0; j < act_sizey; j++){
