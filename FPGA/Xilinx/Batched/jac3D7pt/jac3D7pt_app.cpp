@@ -8,7 +8,7 @@
 #include <chrono>
 #include "stencil_cpu.h"
 
-
+//#define MULTI_SLR
 
 /******************************************************************************
 * Main program
@@ -104,8 +104,10 @@ int main(int argc, char **argv)
     OCL_CHECK(err, cl::Program program(context, devices, bins, NULL, &err));
     OCL_CHECK(err, cl::Kernel krnl_Read_Write(program, "stencil_Read_Write", &err));
     OCL_CHECK(err, cl::Kernel krnl_slr0(program, "stencil_SLR0", &err));
+#ifdef MULTI_SLR
     OCL_CHECK(err, cl::Kernel krnl_slr1(program, "stencil_SLR1", &err));
     OCL_CHECK(err, cl::Kernel krnl_slr2(program, "stencil_SLR2", &err));
+#endif
     auto end_p = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> dur_p = end_p -start_p;
     printf("time to program FPGA is %f\n", dur_p.count());
@@ -114,7 +116,6 @@ int main(int argc, char **argv)
     //Allocate Buffer in Global Memory
     OCL_CHECK(err, cl::Buffer buffer_input(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_WRITE, data_size_bytes, grid_u1_d, &err));
     OCL_CHECK(err, cl::Buffer buffer_output(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_WRITE, data_size_bytes, grid_u2_d, &err));
-
 
 
     //Set the Kernel Arguments
@@ -136,6 +137,7 @@ int main(int argc, char **argv)
     OCL_CHECK(err, err = krnl_slr0.setArg(narg++, data_g.batch));
     OCL_CHECK(err, err = krnl_slr0.setArg(narg++, n_iter));
 
+#ifdef MULTI_SLR
     narg = 0;
     OCL_CHECK(err, err = krnl_slr1.setArg(narg++, data_g.logical_size_x));
     OCL_CHECK(err, err = krnl_slr1.setArg(narg++, data_g.logical_size_y));
@@ -151,23 +153,39 @@ int main(int argc, char **argv)
   	OCL_CHECK(err, err = krnl_slr2.setArg(narg++, data_g.grid_size_x));
   	OCL_CHECK(err, err = krnl_slr2.setArg(narg++, data_g.batch));
   	OCL_CHECK(err, err = krnl_slr2.setArg(narg++, n_iter));
+#endif
 
     //Copy input data to device global memory
     OCL_CHECK(err, err = q.enqueueMigrateMemObjects({buffer_input}, 0 /* 0 means from host*/));
 
 
 	//Launch the Kernel
-    cl::Event event;
+    cl::Event event, event_krnl0;
     OCL_CHECK(err, err = q.enqueueTask(krnl_Read_Write, NULL, &event));
-	OCL_CHECK(err, err = q.enqueueTask(krnl_slr0));
+	OCL_CHECK(err, err = q.enqueueTask(krnl_slr0, NULL, &event_krnl0));
+#ifdef MULTI_SLR
+	cl::Event event_krnl1, event_krnl2;
 	OCL_CHECK(err, err = q.enqueueTask(krnl_slr1));
 	OCL_CHECK(err, err = q.enqueueTask(krnl_slr2));
+#endif
 
 	OCL_CHECK(err, err=event.wait());
-	uint64_t endns = OCL_CHECK(err, event.getProfilingInfo<CL_PROFILING_COMMAND_END>(&err));
-	uint64_t startns = OCL_CHECK(err, event.getProfilingInfo<CL_PROFILING_COMMAND_START>(&err));
-	uint64_t nsduration = endns - startns;
+
+	uint64_t endns0 = OCL_CHECK(err, event_krnl0.getProfilingInfo<CL_PROFILING_COMMAND_END>(&err));
+	uint64_t startns0 = OCL_CHECK(err, event_krnl0.getProfilingInfo<CL_PROFILING_COMMAND_START>(&err));
+#ifndef MULTI_SLR
+	uint64_t nsduration = endns0 - startns0;
+#else
+	uint64_t endns1 = OCL_CHECK(err, event_krnl1.getProfilingInfo<CL_PROFILING_COMMAND_END>(&err));
+	uint64_t startns1 = OCL_CHECK(err, event_krnl1.getProfilingInfo<CL_PROFILING_COMMAND_START>(&err));
+	uint64_t endns2 = OCL_CHECK(err, event_krnl2.getProfilingInfo<CL_PROFILING_COMMAND_END>(&err));
+	uint64_t startns2 = OCL_CHECK(err, event_krnl2.getProfilingInfo<CL_PROFILING_COMMAND_START>(&err));
+
+	uint64_t nsduration = max(max(endns0, endns1), ends2) - min(min(startns0, startns1), startns2);
+#endif
+
 	double k_time = nsduration/(1000000000.0);
+	double k_time_us = nsduration/1000.0;
 	q.finish();
 
 
@@ -183,16 +201,16 @@ int main(int argc, char **argv)
 
     q.finish();
 
-  for(int itr = 0; itr < n_iter*27; itr++){
-      stencil_computation(grid_u1, grid_u2, data_g);
-      stencil_computation(grid_u2, grid_u1, data_g);
-  }
+//  for(int itr = 0; itr < n_iter*27; itr++){
+//      stencil_computation(grid_u1, grid_u2, data_g);
+//      stencil_computation(grid_u2, grid_u1, data_g);
+//  }
     
 
-  printf("Runtime on FPGA is %f seconds\n", k_time);
-  double error = square_error(grid_u1, grid_u1_d, data_g);
+  printf("Runtime on FPGA is %f us\n", k_time_us);
+//  double error = square_error(grid_u1, grid_u1_d, data_g);
   float bandwidth = (data_g.logical_size_x * data_g.logical_size_y * data_g.logical_size_z * sizeof(float) * 4.0 * n_iter * 3* data_g.batch)/(k_time * 1000 * 1000 * 1000);
-  printf("\nMean Square error is  %f\n\n", error/(data_g.logical_size_x * data_g.logical_size_y));
+//  printf("\nMean Square error is  %f\n\n", error/(data_g.logical_size_x * data_g.logical_size_y));
   printf("\nBandwidth is %f\n", bandwidth);
 
   // Releasing allocated memory

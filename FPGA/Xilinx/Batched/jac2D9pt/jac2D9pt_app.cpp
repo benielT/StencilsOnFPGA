@@ -155,17 +155,17 @@ int main(int argc, char **argv)
 
 
   // golden stencil computation on host
-  for(int itr = 0; itr < n_iter*27; itr++){
-      stencil_computation(grid_u1, grid_u2, data_g);
-      stencil_computation(grid_u2, grid_u1, data_g);
-  }
+//  for(int itr = 0; itr < n_iter*27; itr++){
+//      stencil_computation(grid_u1, grid_u2, data_g);
+//      stencil_computation(grid_u2, grid_u1, data_g);
+//  }
     
-  std::chrono::duration<double> elapsed = finish - start;
+  std::chrono::duration<double, std::micro> elapsed = finish - start;
 
-  printf("Runtime on FPGA is %f seconds\n", elapsed.count());
-  double error = square_error(grid_u1, grid_u1_d, data_g);
+  printf("Runtime on FPGA is %f us\n", elapsed.count());
+//  double error = square_error(grid_u1, grid_u1_d, data_g);
   float bandwidth = (data_g.logical_size_x * data_g.logical_size_y * sizeof(float) * 4.0 * n_iter * data_g.batch)/(elapsed.count() * 1000 * 1000 * 1000);
-  printf("\nMean Square error is  %f\n\n", error/(data_g.logical_size_x * data_g.logical_size_y));
+//  printf("\nMean Square error is  %f\n\n", error/(data_g.logical_size_x * data_g.logical_size_y));
   printf("\nOPS Bandwidth is %f\n", bandwidth);
 
   free(grid_u1);

@@ -20,9 +20,9 @@ typedef ap_axiu<32,0,0,0> t_pkt_32;
 #define SHIFT_BITS 3
 #define DATATYPE_SIZE 32
 
-#define P_STAGE_SLR0 9
-#define P_STAGE_SLR1 9
-#define P_STAGE_SLR2 9
+#define P_STAGE_SLR0 12
+//#define P_STAGE_SLR1 4
+//#define P_STAGE_SLR2 4
 
 const int max_size_y = MAX_SIZE_X;
 const int min_size_y = 20;
