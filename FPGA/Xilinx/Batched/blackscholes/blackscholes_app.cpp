@@ -6,7 +6,7 @@
 #include "blackscholes_cpu.h"
 
 //#define DEBUG_VERBOSE
-#define MULTI_SLR
+//#define MULTI_SLR
 #define FPGA_RUN_ONLY
 
 #ifndef FPGA_RUN_ONLY
@@ -105,12 +105,12 @@ int main(int argc, char **argv)
 	double direct_calc_runtime = 0.0;
 
 #ifndef NO_STABILTY_CHECK
-	for (int i = 0; i < gridProp.batch; i++)
-	{
-		double tmp_calc_runtime = 0.0;
-		test_blacksholes_call_option(calcParam, &tmp_calc_runtime);
-		direct_calc_runtime += tmp_calc_runtime;
-	}
+//	for (int i = 0; i < gridProp.batch; i++)
+//	{
+//		double tmp_calc_runtime = 0.0;
+//		test_blacksholes_call_option(calcParam, &tmp_calc_runtime);
+//		direct_calc_runtime += tmp_calc_runtime;
+//	}
 
 	//checking stability condition of blacksholes calculation
 	if (stencil_stability(calcParam))
@@ -184,7 +184,7 @@ int main(int argc, char **argv)
 	cl::Event event;
 
 	auto devices = xcl::get_devices("Xilinx");
-	auto device = devices[1];
+	auto device = devices[0];
 
 	OCL_CHECK(err, cl::Context context(device, NULL, NULL, NULL, &err));
 	OCL_CHECK(err, cl::CommandQueue queue(context, device, CL_QUEUE_PROFILING_ENABLE | CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, &err));
@@ -215,7 +215,7 @@ int main(int argc, char **argv)
 	unsigned int total_SLR = 1;
 #endif
 
-	unsigned int number_of_process_grid_per_SLR = 16;
+	unsigned int number_of_process_grid_per_SLR = 48;
 	unsigned int total_process_grids_per_iter =  total_SLR * number_of_process_grid_per_SLR * 2;
 	unsigned int num_iter = gridProp.num_iter/total_process_grids_per_iter;
 	//set Kernel arguments
