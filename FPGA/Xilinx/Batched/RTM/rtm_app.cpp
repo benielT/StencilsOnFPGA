@@ -47,7 +47,7 @@
 
 #include "rtm.h"
 #define SLR_COUNT_2
-
+#define RW_MODULE
 
 // // OPS header file
 // #define OPS_2D
@@ -183,13 +183,21 @@ int main(int argc, char **argv)
     auto start_p = std::chrono::high_resolution_clock::now();
     OCL_CHECK(err, cl::Program program(context, devices, bins, NULL, &err));
     auto end_p = std::chrono::high_resolution_clock::now();
-
+#ifndef RW_MODULE
     OCL_CHECK(err, cl::Kernel krnl_rtm_SLR0(program, "rtm_SLR0", &err));
+#else
+    OCL_CHECK(err, cl::Kernel krnl_read_write(program, "Read_write_SLR0", &err));
+#endif
 #ifndef SLR_COUNT_2
     OCL_CHECK(err, cl::Kernel krnl_rtm_SLR1(program, "rtm_SLR1", &err));
 #endif
-    OCL_CHECK(err, cl::Kernel krnl_rtm_SLR2(program, "rtm_SLR2", &err));
 
+#ifndef RW_MODULE
+    OCL_CHECK(err, cl::Kernel krnl_rtm_SLR2(program, "rtm_SLR2", &err));
+#else
+    OCL_CHECK(err, cl::Kernel krnl_rtm_SLR2_1(program, "rtm_SLR2", &err));
+    OCL_CHECK(err, cl::Kernel krnl_rtm_SLR2_2(program, "rtm_SLR2", &err));
+#endif
     std::chrono::duration<double> p_time = end_p - start_p;
     printf("time to program FPGA is : %f\n ", p_time.count());
 
@@ -211,6 +219,7 @@ int main(int argc, char **argv)
 
     //Set the Kernel Arguments
     int narg = 0;
+#ifndef RW_MODULE
     OCL_CHECK(err, err = krnl_rtm_SLR0.setArg(narg++, buffer_input));
     OCL_CHECK(err, err = krnl_rtm_SLR0.setArg(narg++, buffer_output));
     OCL_CHECK(err, err = krnl_rtm_SLR0.setArg(narg++, grid_d.logical_size_x));
@@ -219,6 +228,16 @@ int main(int argc, char **argv)
     OCL_CHECK(err, err = krnl_rtm_SLR0.setArg(narg++, grid_d.grid_size_x));
     OCL_CHECK(err, err = krnl_rtm_SLR0.setArg(narg++, n_iter));
     OCL_CHECK(err, err = krnl_rtm_SLR0.setArg(narg++, batch));
+#else
+    OCL_CHECK(err, err = krnl_read_write.setArg(narg++, buffer_input));
+    OCL_CHECK(err, err = krnl_read_write.setArg(narg++, buffer_output));
+    OCL_CHECK(err, err = krnl_read_write.setArg(narg++, grid_d.logical_size_x));
+    OCL_CHECK(err, err = krnl_read_write.setArg(narg++, grid_d.logical_size_y));
+    OCL_CHECK(err, err = krnl_read_write.setArg(narg++, grid_d.logical_size_z));
+    OCL_CHECK(err, err = krnl_read_write.setArg(narg++, grid_d.grid_size_x));
+    OCL_CHECK(err, err = krnl_read_write.setArg(narg++, n_iter));
+    OCL_CHECK(err, err = krnl_read_write.setArg(narg++, batch));
+#endif
 
 #ifndef SLR_COUNT_2
     narg = 0;
@@ -230,6 +249,7 @@ int main(int argc, char **argv)
     OCL_CHECK(err, err = krnl_rtm_SLR1.setArg(narg++, batch));
 #endif
 
+#ifndef RW_MODULE
     narg = 0;
     OCL_CHECK(err, err = krnl_rtm_SLR2.setArg(narg++, grid_d.logical_size_x));
     OCL_CHECK(err, err = krnl_rtm_SLR2.setArg(narg++, grid_d.logical_size_y));
@@ -237,7 +257,23 @@ int main(int argc, char **argv)
     OCL_CHECK(err, err = krnl_rtm_SLR2.setArg(narg++, grid_d.grid_size_x));
     OCL_CHECK(err, err = krnl_rtm_SLR2.setArg(narg++, n_iter));
     OCL_CHECK(err, err = krnl_rtm_SLR2.setArg(narg++, batch));
+#else
+    narg = 0;
+    OCL_CHECK(err, err = krnl_rtm_SLR2_1.setArg(narg++, grid_d.logical_size_x));
+    OCL_CHECK(err, err = krnl_rtm_SLR2_1.setArg(narg++, grid_d.logical_size_y));
+    OCL_CHECK(err, err = krnl_rtm_SLR2_1.setArg(narg++, grid_d.logical_size_z));
+    OCL_CHECK(err, err = krnl_rtm_SLR2_1.setArg(narg++, grid_d.grid_size_x));
+    OCL_CHECK(err, err = krnl_rtm_SLR2_1.setArg(narg++, n_iter));
+    OCL_CHECK(err, err = krnl_rtm_SLR2_1.setArg(narg++, batch));
 
+    narg = 0;
+    OCL_CHECK(err, err = krnl_rtm_SLR2_2.setArg(narg++, grid_d.logical_size_x));
+    OCL_CHECK(err, err = krnl_rtm_SLR2_2.setArg(narg++, grid_d.logical_size_y));
+    OCL_CHECK(err, err = krnl_rtm_SLR2_2.setArg(narg++, grid_d.logical_size_z));
+    OCL_CHECK(err, err = krnl_rtm_SLR2_2.setArg(narg++, grid_d.grid_size_x));
+    OCL_CHECK(err, err = krnl_rtm_SLR2_2.setArg(narg++, n_iter));
+    OCL_CHECK(err, err = krnl_rtm_SLR2_2.setArg(narg++, batch));
+#endif
 
     //Copy input data to device global memory
     OCL_CHECK(err,
@@ -249,12 +285,20 @@ int main(int argc, char **argv)
     uint64_t nstimestart, nstimeend;
     auto start = std::chrono::high_resolution_clock::now();
 
-
+#ifndef RW_MODULE
 	OCL_CHECK(err, err = q.enqueueTask(krnl_rtm_SLR0));
+#else
+	OCL_CHECK(err, err = q.enqueueTask(krnl_read_write));
+#endif
 #ifndef SLR_COUNT_2
 	OCL_CHECK(err, err = q.enqueueTask(krnl_rtm_SLR1));
 #endif
+#ifndef RW_MODULE
 	OCL_CHECK(err, err = q.enqueueTask(krnl_rtm_SLR2));
+#else
+	OCL_CHECK(err, err = q.enqueueTask(krnl_rtm_SLR2_1));
+	OCL_CHECK(err, err = q.enqueueTask(krnl_rtm_SLR2_2));
+#endif
 	q.finish();
 
     auto finish = std::chrono::high_resolution_clock::now();
